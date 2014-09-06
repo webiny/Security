@@ -3,6 +3,30 @@ Security Component
 
 The security component is a layer that takes care of the authentication and authorization processes for you.
 
+Install the component
+---------------------
+The best way to install the component is using Composer.
+
+```json
+{
+    "require": {
+        "webiny/security": "dev-master"
+    }
+}
+```
+For additional versions of the package, visit the [Packagist page](https://packagist.org/packages/webiny/security).
+Optionally you can add `"minimum-stability": "dev"` flag to your composer.json.
+
+Once you have your `composer.json` file in place, just run the install command.
+
+    $ php composer.phar install
+
+To learn more about Composer, and how to use it, please visit [this link](https://getcomposer.org/doc/01-basic-usage.md).
+
+Alternatively, you can also do a `git checkout` of the repo.
+
+# About
+
 Before we go into details, is important that you are familiar with the terms of authorization, authentication and
 access control, if you are not, please read the following articles:
 
@@ -437,8 +461,6 @@ There are also some, user provider specific, events:
 - `wf.security.user.twitter` fired when user is authenticated over Twitter OAuth provider
 
 Each of those two events, returns a different class, for OAuth2 it's `Webiny\Component\Security\User\Providers\OAuth2\OAuth2Event` and for Twitter it's `Webiny\Component\Security\User\Providers\TwitterOAuth`. Both classes have two methods, one returns an object, containing different user information we manged to get from the OAuth(2) server. The other method returns an instance of the OAuth class, either TwitterOAuth or OAuth2, giving you direct access to the API and the access key.
-
-
 
 Resources
 ---------
