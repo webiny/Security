@@ -6,5 +6,3 @@ Crypt:
         Cookie:
             Class: \Webiny\Component\Crypt\Crypt
             Arguments: [Blowfish, CCM, rijndael-128, _FOO_VECTOR]
-    ClassLoader:
-        CryptLib: /var/www/projects/webiny/Vendors/PHP-CryptLib/lib/CryptLib

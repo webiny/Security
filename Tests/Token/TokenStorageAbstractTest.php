@@ -7,8 +7,6 @@
 
 namespace Webiny\Component\Security\Tests\Token;
 
-//require_once '/var/www/projects/webiny/Vendors/PHP-CryptLib/lib/CryptLib/bootstrap.php';
-
 use Webiny\Component\Config\ConfigObject;
 use Webiny\Component\Security\Role\Role;
 use Webiny\Component\Security\Tests\Mocks\TokenCryptMock;
