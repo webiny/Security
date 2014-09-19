@@ -37,7 +37,8 @@ class Form implements AuthenticationInterface
     function getLoginObject(ConfigObject $config)
     {
         return new Login($this->httpRequest()->post('username', ''), $this->httpRequest()->post('password', ''
-                                                                   ), $this->httpRequest()->post('rememberme', false));
+            ), $this->httpRequest()->post('rememberme', false)
+        );
     }
 
     /**

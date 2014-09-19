@@ -126,7 +126,8 @@ class OAuth2 implements AuthenticationInterface
         $oauthState = $this->httpRequest()->query('state', '');
         $state = $this->httpSession()->get('oauth_state', 'invalid');
         if ($oauthState != $state) {
-            throw new OAuth2Exception('The state parameter from OAuth2 response doesn\'t match the users state parameter.');
+            throw new OAuth2Exception('The state parameter from OAuth2 response doesn\'t match the users state parameter.'
+            );
         }
 
         $oauth2->setAccessToken($accessToken);
