@@ -24,7 +24,8 @@ class RoleHierarchyTest extends \PHPUnit_Framework_TestCase
                                                'ROLE_USER'  => 'ROLE_EDITOR',
                                                'ROLE_ADMIN' => 'ROLE_USER',
                                                'ROLE_MOCK'  => 'ROLE_ADMIN'
-                                           ]);
+                                           ]
+        );
 
         $roles = [new Role('ROLE_EDITOR')];
         $this->assertCount(1, $roleHierarchy->getAccessibleRoles($roles));

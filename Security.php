@@ -83,12 +83,14 @@ class Security
 
 
                 if (!$firewall) {
-                    throw new SecurityException("Firewall '" . $firewallKey . "' is not defined under Security.Firewalls.");
+                    throw new SecurityException("Firewall '" . $firewallKey . "' is not defined under Security.Firewalls."
+                    );
                 }
             }
 
             $fw = new Firewall($firewallKey, $firewall, $this->_getFirewallUserProviders($firewallKey
-            ), $this->_getFirewallEncoder($firewallKey));
+                ), $this->_getFirewallEncoder($firewallKey)
+            );
 
             $this->_firewalls[$firewallKey] = $fw;
         }
@@ -211,7 +213,8 @@ class Security
         $encoder = $this->_getFirewallConfig($firewallKey)->get('Encoder', '_null');
         if (!isset($this->_encoders[$encoder])) {
             if ($encoder != '') {
-                throw new SecurityException('Encoder "' . $encoder . '" is not defined in your Security.Encoders config.');
+                throw new SecurityException('Encoder "' . $encoder . '" is not defined in your Security.Encoders config.'
+                );
             } else {
                 return $this->_encoders['_null'];
             }

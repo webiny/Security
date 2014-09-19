@@ -128,7 +128,8 @@ class Firewall
             $login = $this->_getAuthProvider($authProvider)->getLoginObject($this->getConfig());
             if (!$this->isInstanceOf($login, 'Webiny\Component\Security\Authentication\Providers\Login')) {
                 throw new FirewallException('Authentication provider method getLoginObject() must return an instance of
-														"Webiny\Component\Security\Authentication\Providers\Login".');
+														"Webiny\Component\Security\Authentication\Providers\Login".'
+                );
             }
             $login->setAuthProviderName($authProvider);
         } catch (\Exception $e) {
@@ -303,7 +304,8 @@ class Firewall
         }
 
         if (!$this->_authProviderConfig || !$this->_authProviderConfig->get('Driver', false)) {
-            throw new FirewallException('Unable to detect configuration for authentication provider "' . $authProvider . '".');
+            throw new FirewallException('Unable to detect configuration for authentication provider "' . $authProvider . '".'
+            );
         }
 
         return $this->_authProviderConfig;
