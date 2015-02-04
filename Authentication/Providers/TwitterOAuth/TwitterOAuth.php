@@ -46,8 +46,8 @@ class TwitterOAuth implements AuthenticationInterface
     /**
      * Base constructor.
      *
-     * @param string       $serverName Name of the TwitterOAuth server in the current configuration.
-     * @param string|array $roles      Roles that will be set for the OAuth users.
+     * @param string $serverName  Name of the TwitterOAuth server in the current configuration.
+     * @param string|array $roles Roles that will be set for the OAuth users.
      *
      * @throws TwitterOAuthException
      */
@@ -73,53 +73,51 @@ class TwitterOAuth implements AuthenticationInterface
      */
     function getLoginObject(ConfigObject $config)
     {
-        // step1 -> get access token
-        if (!$this->httpSession()->get('tw_oauth_token_secret', false)) {
+        try {
+            // step1 -> get access token
 
-            $requestToken = $this->_connection->getRequestToken();
+            if (!$this->httpSession()->get('tw_oauth_token_secret', false)) {
 
-            // save the session for later
-            $this->httpSession()->save('tw_oauth_token', $requestToken['oauth_token']);
-            $this->httpSession()->save('tw_oauth_token_secret', $requestToken['oauth_token_secret']);
+                $requestToken = $this->_connection->getRequestToken();
 
-            // check response code
-            if ($this->_connection->getResponseCode() == 200) {
+                // save the session for later
+                $this->httpSession()->save('tw_oauth_token', $requestToken['oauth_token']);
+                $this->httpSession()->save('tw_oauth_token_secret', $requestToken['oauth_token_secret']);
+
+                // check response code
                 $authUrl = $this->_connection->getAuthorizeUrl($requestToken['oauth_token']);
 
                 header('Location: ' . $authUrl);
                 die('Redirect');
             } else {
-                throw new TwitterOAuthException('Could not connect to Twitter. Refresh the page or try again later.');
-            }
-        } else {
-            $this->_connection->authorize($this->httpSession()->get('tw_oauth_token'),
-                                          $this->httpSession()->get('tw_oauth_token_secret')
-            );
+                // request access tokens from twitter
+                if ($this->httpRequest()->query('oauth_verifier', false)) {
+                    $access_token = $this->_connection->requestAccessToken($this->httpSession()->get('tw_oauth_token'),
+                                                                       $this->httpSession()->get('tw_oauth_token_secret'),
+                                                                       $this->httpRequest()->query('oauth_token'),
+                                                                       $this->httpRequest()->query('oauth_verifier')
+                    );
+                } else {
+                    // remove no longer needed request tokens
+                    $this->httpSession()->delete('tw_oauth_token');
+                    $this->httpSession()->delete('tw_oauth_token_secret');
 
-            // request access tokens from twitter
-            if ($this->httpRequest()->query('oauth_verifier', false)) {
-                $access_token = $this->_connection->getAccessToken($this->httpRequest()->query('oauth_verifier'));
-            } else {
+                    // redirect back to login
+                    $this->httpRedirect($this->httpRequest()->getCurrentUrl());
+                }
+
+                // save the access tokens. Normally these would be saved in a database for future use.
+                $this->httpSession()->save('tw_access_token', $access_token);
+
                 // remove no longer needed request tokens
                 $this->httpSession()->delete('tw_oauth_token');
                 $this->httpSession()->delete('tw_oauth_token_secret');
-
-                // redirect back to login
-                $this->httpRequest()->redirect($this->httpRequest()->getCurrentUrl());
             }
-
-            // error check
-            if ($this->_connection->getResponseCode() != 200) {
-                throw new TwitterOAuthException('Could not connect to Twitter. Refresh the page or try again later.');
-            }
-
-            // save the access tokens. Normally these would be saved in a database for future use.
-            $this->httpSession()->save('tw_access_token', $access_token);
-
-            // remove no longer needed request tokens
-            $this->httpSession()->delete('tw_oauth_token');
+        } catch (\Exception $e) {
             $this->httpSession()->delete('tw_oauth_token_secret');
+            throw new TwitterOAuthException($e->getMessage());
         }
+
 
         // step2 -> return the login object with auth token
         $login = new Login('', '');

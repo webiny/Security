@@ -7,22 +7,10 @@ Install the component
 ---------------------
 The best way to install the component is using Composer.
 
-```json
-{
-    "require": {
-        "webiny/security": "1.1.*"
-    }
-}
+```bash
+composer require webiny/security
 ```
 For additional versions of the package, visit the [Packagist page](https://packagist.org/packages/webiny/security).
-
-Once you have your `composer.json` file in place, just run the install command.
-
-    $ php composer.phar install
-
-To learn more about Composer, and how to use it, please visit [this link](https://getcomposer.org/doc/01-basic-usage.md).
-
-Alternatively, you can also do a `git checkout` of the repo.
 
 # About
 
@@ -40,6 +28,18 @@ If you what to know more:
 
 # Usage
 
+NOTE: There are 2 ways of accessing your firewalls.
+
+The long way:
+```php
+$firewall = $this->security()->firewall('admin');
+```
+
+And the short way:
+```php
+$firewall = $this->security('admin');
+```
+
 The usage of the component is fairly simple:
 
 First you process the user login:
@@ -50,7 +50,7 @@ class MyClass
 
     function loginUser()
     {
-        $loginSuccessful = $this->security()->firewall('admin')->processLogin();
+        $loginSuccessful = $this->security('admin')->processLogin();
     }
 }
 ```
@@ -63,7 +63,7 @@ class MyClass
 
     function myMethod(){
         // get authenticated user
-        $user = $this->security()->firewall('admin')->getUser();
+        $user = $this->security('admin')->getUser();
 
         // check if user has a role
         if($user->hasRole('ROLE_EDITOR')) {
@@ -71,7 +71,7 @@ class MyClass
         }
 
         // check if current user can access the current url
-        if($this->security()->firewall('admin')->isUserAllowedAccess()){
+        if($this->security('admin')->isUserAllowedAccess()){
             // user can access the current url based on the defined access rules
         }
     }
@@ -86,7 +86,7 @@ class MyClass
 
     function logoutUser()
     {
-        $logoutSuccessful = $this->security()->firewall('admin')->processLogout();
+        $logoutSuccessful = $this->security('admin')->processLogout();
     }
 }
 ```
@@ -116,6 +116,13 @@ Security:
         SomeBuiltInMemoryProvider:
             john: {password: secret, roles: 'ROLE_USER'}
             admin: {password: login123, roles: 'ROLE_SUPERADMIN'}
+        FromDatabase:
+            Driver: '\Webiny\Component\Security\User\Providers\Entity\Entity'
+            Params:
+                Entity: 'My\App\Entities\User'
+                Username: username
+                Password: password
+                Role: ROLE_USER
     AuthenticationProviders:
         Http:
             Driver: '\Webiny\Component\Security\Authentication\Providers\Http\Http'
@@ -259,6 +266,26 @@ Security:
         TwitterOAuthProvider:
             Driver: '\Webiny\Component\Security\User\Providers\TwitterOAuth\TwitterOAuth'
 ```
+
+### Entity provider
+
+This provider uses the Entity component which is tied to your database. 
+ 
+```yaml
+FromDatabase:
+    Driver: '\Webiny\Component\Security\User\Providers\Entity\Entity'
+    Params:
+        Entity: 'My\App\Entities\User'
+        Username: username
+        Password: password
+        Role: ROLE_USER
+```
+
+**Entity** parameter points your entity class.
+**Username** defines the field name in the collection that holds the username.
+**Password** same as the username, just points to the password field.
+**Role** points either to the collection field holding the users role, or will be used as the role name, if the field doesn't exist.
+
 
 ### Custom user providers
 
