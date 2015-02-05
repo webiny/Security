@@ -8,6 +8,7 @@
 namespace Webiny\Component\Security\Tests\Authorization;
 
 use Webiny\Component\Config\ConfigObject;
+use Webiny\Component\Http\Request;
 use Webiny\Component\Security\Authorization\AccessControl;
 use Webiny\Component\Security\Role\Role;
 use Webiny\Component\Security\Tests\Mocks\UserMock;
@@ -35,9 +36,6 @@ class AccessControlTest extends \PHPUnit_Framework_TestCase
         new AccessControl($user, $config);
     }
 
-    /**
-     * @runInSeparateProcess
-     */
     public function testIsUserAllowedAccessNoRolesDefined()
     {
         $user = new UserMock();
@@ -47,16 +45,10 @@ class AccessControlTest extends \PHPUnit_Framework_TestCase
         $this->assertTrue($instance->isUserAllowedAccess());
     }
 
-    /**
-     * @runInSeparateProcess
-     */
     public function testIsUserAllowedAccessNoRolesRequired()
     {
         // lets mock the address to one that doesn't match any rules
-        $_SERVER = [
-            'REQUEST_URI' => '/some-page/',
-            'SERVER_NAME' => 'admin.w3.com'
-        ];
+        Request::getInstance()->setCurrentUrl('http://admin.w3.com/some-page/');
 
         $user = new UserMock();
         $user->populate('test', 'test', [new Role('ROLE_MOCK')], true);
@@ -75,16 +67,10 @@ class AccessControlTest extends \PHPUnit_Framework_TestCase
         $this->assertTrue($instance->isUserAllowedAccess());
     }
 
-    /**
-     * @runInSeparateProcess
-     */
     public function testIsUserAllowedAccessRoleRequiredButDenied()
     {
         // lets mock the address to one that doesn't match any rules
-        $_SERVER = [
-            'REQUEST_URI' => '/about/',
-            'SERVER_NAME' => 'admin.w3.com'
-        ];
+        Request::getInstance()->setCurrentUrl('http://admin.w3.com/about/');
 
         $user = new UserMock();
         $user->populate('test', 'test', [new Role('ROLE_MOCK')], true);
@@ -103,16 +89,10 @@ class AccessControlTest extends \PHPUnit_Framework_TestCase
         $this->assertFalse($instance->isUserAllowedAccess());
     }
 
-    /**
-     * @runInSeparateProcess
-     */
     public function testIsUserAllowedAccessRoleRequiredButGranted()
     {
         // lets mock the address to one that doesn't match any rules
-        $_SERVER = [
-            'REQUEST_URI' => '/about/',
-            'SERVER_NAME' => 'admin.w3.com'
-        ];
+        Request::getInstance()->setCurrentUrl('http://admin.w3.com/about/');
 
         $user = new UserMock();
         $user->populate('test', 'test', [new Role('ROLE_MOCK')], true);
@@ -131,16 +111,10 @@ class AccessControlTest extends \PHPUnit_Framework_TestCase
         $this->assertTrue($instance->isUserAllowedAccess());
     }
 
-    /**
-     * @runInSeparateProcess
-     */
     public function testIsUserAllowedAccessDecisionStrategyAffirmative()
     {
         // lets mock the address to one that doesn't match any rules
-        $_SERVER = [
-            'REQUEST_URI' => '/about/',
-            'SERVER_NAME' => 'admin.w3.com'
-        ];
+        Request::getInstance()->setCurrentUrl('http://admin.w3.com/about/');
 
         $user = new UserMock();
         $user->populate('test', 'test', [new Role('ROLE_MOCK')], true);

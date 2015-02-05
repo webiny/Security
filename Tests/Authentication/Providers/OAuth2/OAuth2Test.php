@@ -8,6 +8,7 @@
 namespace Webiny\Component\Security\Tests\Authentication\Providers\OAuth2;
 
 use Webiny\Component\Config\ConfigObject;
+use Webiny\Component\Http\Request;
 use Webiny\Component\Http\Session;
 use Webiny\Component\Security\Authentication\Providers\OAuth2\OAuth2;
 
@@ -22,9 +23,8 @@ class OAuth2Test extends \PHPUnit_Framework_TestCase
 
     public function testConstructor()
     {
-        $this->assertInstanceOf('\Webiny\Component\Security\Authentication\Providers\OAuth2\OAuth2',
-                                new OAuth2('Facebook', ['ROLE_ADMIN'])
-        );
+        $instance = new OAuth2('Facebook', ['ROLE_ADMIN']);
+        $this->assertInstanceOf('\Webiny\Component\Security\Authentication\Providers\OAuth2\OAuth2', $instance);
     }
 
     /**
@@ -36,7 +36,6 @@ class OAuth2Test extends \PHPUnit_Framework_TestCase
     }
 
     /**
-     * @runInSeparateProcess
      * @expectedException \Webiny\Component\Security\Authentication\Providers\OAuth2\OAuth2Exception
      * @expectedExceptionMessage Redirecting
      */
@@ -48,12 +47,12 @@ class OAuth2Test extends \PHPUnit_Framework_TestCase
     }
 
     /**
-     * @runInSeparateProcess
      * @expectedException \Webiny\Component\Security\Authentication\Providers\OAuth2\OAuth2Exception
      * @expectedExceptionMessage The state parameter
      */
     public function testGetLoginObjectStep1Dot1()
     {
+        Request::deleteInstance();
         Session::getInstance()->save('oauth_token', '123');
         $_GET['code'] = 'some code';
 
@@ -62,11 +61,9 @@ class OAuth2Test extends \PHPUnit_Framework_TestCase
         $oauth2->getLoginObject(new ConfigObject([]));
     }
 
-    /**
-     * @runInSeparateProcess
-     */
     public function testGetLoginObjectValidState()
     {
+        Request::deleteInstance();
         Session::getInstance()->save('oauth_token', '123');
         Session::getInstance()->save('oauth_state', 'state-id');
         $_GET['code'] = 'some code';

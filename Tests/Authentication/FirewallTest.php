@@ -9,6 +9,7 @@ namespace Webiny\Component\Security\Tests\Authentication;
 
 
 use Webiny\Component\Config\Config;
+use Webiny\Component\Http\Request;
 use Webiny\Component\Security\Authentication\Firewall;
 use Webiny\Component\Security\Encoder\Encoder;
 use Webiny\Component\Security\Security;
@@ -30,7 +31,6 @@ class FirewallTest extends \PHPUnit_Framework_TestCase
      * @param Firewall $firewall
      *
      * @dataProvider firewallProvider
-     * @runInSeparateProcess
      */
     public function testConstructor($firewall)
     {
@@ -41,7 +41,6 @@ class FirewallTest extends \PHPUnit_Framework_TestCase
      * @param Firewall $firewall
      *
      * @dataProvider firewallProvider
-     * @runInSeparateProcess
      */
     public function testProcessLoginNoAuthProviderName($firewall)
     {
@@ -53,7 +52,6 @@ class FirewallTest extends \PHPUnit_Framework_TestCase
      * @param Firewall $firewall
      *
      * @dataProvider firewallProvider
-     * @runInSeparateProcess
      */
     public function testProcessLoginWithAuthProviderName($firewall)
     {
@@ -65,7 +63,6 @@ class FirewallTest extends \PHPUnit_Framework_TestCase
      * @param Firewall $firewall
      *
      * @dataProvider firewallProvider
-     * @runInSeparateProcess
      */
     public function testProcessLoginWithAuthProviderNameAndNotAuthenticatedUser($firewall)
     {
@@ -78,7 +75,6 @@ class FirewallTest extends \PHPUnit_Framework_TestCase
      * @param Firewall $firewall
      *
      * @dataProvider             firewallProvider
-     * @runInSeparateProcess
      * @expectedException \Webiny\Component\Security\Authentication\FirewallException
      * @expectedExceptionMessage Unable to detect configuration for authentication provide
      */
@@ -91,10 +87,10 @@ class FirewallTest extends \PHPUnit_Framework_TestCase
      * @param Firewall $firewall
      *
      * @dataProvider firewallProvider
-     * @runInSeparateProcess
      */
     public function testProcessLogout($firewall)
     {
+        UserProviderMock::$returnLoginObject = true;
         $result = $firewall->processLogin('MockProvider');
         $this->assertTrue($result);
         $result = $firewall->processLogout();
@@ -105,7 +101,6 @@ class FirewallTest extends \PHPUnit_Framework_TestCase
      * @param Firewall $firewall
      *
      * @dataProvider firewallProvider
-     * @runInSeparateProcess
      */
     public function testGetUserWhileNotAuthenticated($firewall)
     {
@@ -118,7 +113,6 @@ class FirewallTest extends \PHPUnit_Framework_TestCase
      * @param Firewall $firewall
      *
      * @dataProvider firewallProvider
-     * @runInSeparateProcess
      */
     public function testGetUserWhileAuthenticated($firewall)
     {
@@ -131,17 +125,12 @@ class FirewallTest extends \PHPUnit_Framework_TestCase
      * @param Firewall $firewall
      *
      * @dataProvider firewallProvider
-     * @runInSeparateProcess
      */
     public function testIsUserAllowedAccessOnAddressThatIsNotInAccessRules($firewall)
     {
         $firewall->processLogin('MockProvider'); // let's authenticate the user
 
-        // lets mock the address
-        $_SERVER = [
-            'REQUEST_URI' => '/batman-is-better-than-superman/?batman=one&superman=two',
-            'SERVER_NAME' => 'admin.w3.com'
-        ];
+        Request::getInstance()->setCurrentUrl('http://admin.w3.com/batman-is-better-than-superman/?batman=one&superman=two');
 
         $result = $firewall->isUserAllowedAccess();
         $this->assertTrue($result);
@@ -151,17 +140,12 @@ class FirewallTest extends \PHPUnit_Framework_TestCase
      * @param Firewall $firewall
      *
      * @dataProvider firewallProvider
-     * @runInSeparateProcess
      */
     public function testIsUserAllowedAccessOnAddressThatIsInsideAccessRules($firewall)
     {
         $firewall->processLogin('MockProvider'); // let's authenticate the user
 
-        // lets mock the address
-        $_SERVER = [
-            'REQUEST_URI' => '/allowed/?batman=one&superman=two',
-            'SERVER_NAME' => 'admin.w3.com'
-        ];
+        Request::getInstance()->setCurrentUrl('http://admin.w3.com/allowed/?batman=one&superman=two');
 
         $result = $firewall->isUserAllowedAccess();
         $this->assertTrue($result);
@@ -171,18 +155,12 @@ class FirewallTest extends \PHPUnit_Framework_TestCase
      * @param Firewall $firewall
      *
      * @dataProvider firewallProvider
-     * @runInSeparateProcess
      */
     public function testIsUserAllowedAccessOnAddressThatIsInsideAccessRulesRegex($firewall)
     {
         $firewall->processLogin('MockProvider'); // let's authenticate the user
 
-        // lets mock the address
-        $_SERVER = [
-            'REQUEST_URI' => '/iamturganbaev/more-about-kyrgyzstan/532c08a1afb28/',
-            'SERVER_NAME' => 'admin.w3.com'
-        ];
-
+        Request::getInstance()->setCurrentUrl('http://admin.w3.com/iamturganbaev/more-about-kyrgyzstan/532c08a1afb28/');
         $result = $firewall->isUserAllowedAccess();
         $this->assertTrue($result);
     }
@@ -191,18 +169,12 @@ class FirewallTest extends \PHPUnit_Framework_TestCase
      * @param Firewall $firewall
      *
      * @dataProvider firewallProvider
-     * @runInSeparateProcess
      */
     public function testIsUserDeniedAccessOnAddressThatIsInsideAccessRules($firewall)
     {
         $firewall->processLogin('MockProvider'); // let's authenticate the user
 
-        // lets mock the address
-        $_SERVER = [
-            'REQUEST_URI' => '/about/',
-            'SERVER_NAME' => 'admin.w3.com'
-        ];
-
+        Request::getInstance()->setCurrentUrl('http://admin.w3.com/about/');
         $result = $firewall->isUserAllowedAccess();
         $this->assertFalse($result);
     }
@@ -211,7 +183,6 @@ class FirewallTest extends \PHPUnit_Framework_TestCase
      * @param Firewall $firewall
      *
      * @dataProvider firewallProvider
-     * @runInSeparateProcess
      */
     public function testGetRealName($firewall)
     {
@@ -222,7 +193,6 @@ class FirewallTest extends \PHPUnit_Framework_TestCase
      * @param Firewall $firewall
      *
      * @dataProvider firewallProvider
-     * @runInSeparateProcess
      */
     public function testGetAnonymousAccess($firewall)
     {
@@ -233,7 +203,6 @@ class FirewallTest extends \PHPUnit_Framework_TestCase
      * @param Firewall $firewall
      *
      * @dataProvider firewallProvider
-     * @runInSeparateProcess
      */
     public function testGetConfig($firewall)
     {
@@ -246,7 +215,6 @@ class FirewallTest extends \PHPUnit_Framework_TestCase
      * @param Firewall $firewall
      *
      * @dataProvider firewallProvider
-     * @runInSeparateProcess
      */
     public function testGetToken($firewall)
     {
@@ -257,7 +225,6 @@ class FirewallTest extends \PHPUnit_Framework_TestCase
      * @param Firewall $firewall
      *
      * @dataProvider firewallProvider
-     * @runInSeparateProcess
      */
     public function testGetFirewallKey($firewall)
     {
@@ -266,6 +233,7 @@ class FirewallTest extends \PHPUnit_Framework_TestCase
 
     public function firewallProvider()
     {
+        Security::deleteInstance();
         Security::setConfig(__DIR__ . '/../ExampleConfig.yaml');
         $config = Config::getInstance()->yaml(__DIR__ . '/../ExampleConfig.yaml');
         $firewallConfig = $config->Security->Firewalls->Admin;
