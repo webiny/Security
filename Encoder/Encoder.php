@@ -22,29 +22,21 @@ class Encoder
     use StdLibTrait, FactoryLoaderTrait;
 
     /**
-     * @var string Salt added to the passwords
-     */
-    private $_salt;
-
-    /**
      * @var EncoderInterface
      */
-    private $_encoderProviderInstance;
+    private $encoderProviderInstance;
 
 
     /**
      * @param string     $driver Name of the encoder provider class.
-     * @param string     $salt   Salt used to add more security to passwords.
      * @param array|null $params Optional encoder params.
      *
      * @throws EncoderException
      */
-    function __construct($driver, $salt = '', $params = null)
+    public function __construct($driver, $params = null)
     {
-        $this->_salt = $salt;
-
         try {
-            $this->_encoderProviderInstance = $this->factory($driver,
+            $this->encoderProviderInstance = $this->factory($driver,
                                                              '\Webiny\Component\Security\Encoder\EncoderDriverInterface',
                                                              $params
             );
@@ -60,9 +52,9 @@ class Encoder
      *
      * @return string Password hash.
      */
-    function createPasswordHash($password)
+    public function createPasswordHash($password)
     {
-        return $this->_encoderProviderInstance->createPasswordHash($password . $this->_salt);
+        return $this->encoderProviderInstance->createPasswordHash($password);
     }
 
     /**
@@ -73,8 +65,8 @@ class Encoder
      *
      * @return bool True if $password matches $hash. Otherwise false is returned.
      */
-    function verifyPasswordHash($password, $hash)
+    public function verifyPasswordHash($password, $hash)
     {
-        return $this->_encoderProviderInstance->verifyPasswordHash($password . $this->_salt, $hash);
+        return $this->encoderProviderInstance->verifyPasswordHash($password, $hash);
     }
 }

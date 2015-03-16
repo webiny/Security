@@ -22,19 +22,18 @@ class Crypt implements EncoderDriverInterface
     /**
      * @var null|\Webiny\Component\Crypt\Crypt
      */
-    private $_instance = null;
+    private $instance = null;
+    
 
     /**
      * Constructor
      *
-     * @param string $cryptName Name of the crypt service.
-     *
      * @throws \Exception
      */
-    public function __construct($cryptName)
+    public function __construct()
     {
         try {
-            $this->_instance = $this->crypt($cryptName);
+            $this->instance = $this->crypt();
         } catch (\Exception $e) {
             throw $e;
         }
@@ -47,9 +46,9 @@ class Crypt implements EncoderDriverInterface
      *
      * @return string Password hash.
      */
-    function createPasswordHash($password)
+    public function createPasswordHash($password)
     {
-        return $this->_instance->createPasswordHash($password);
+        return $this->instance->createPasswordHash($password);
     }
 
     /**
@@ -60,8 +59,8 @@ class Crypt implements EncoderDriverInterface
      *
      * @return bool True if $password matches $hash. Otherwise false is returned.
      */
-    function verifyPasswordHash($password, $hash)
+    public function verifyPasswordHash($password, $hash)
     {
-        return $this->_instance->verifyPasswordHash($password, $hash);
+        return $this->instance->verifyPasswordHash($password, $hash);
     }
 }
