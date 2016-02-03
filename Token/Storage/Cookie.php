@@ -57,4 +57,23 @@ class Cookie extends TokenStorageAbstract
     {
         return $this->httpCookie()->delete($this->getTokenName());
     }
+
+    /**
+     * Get token string representation
+     * @return string
+     */
+    public function getTokenString()
+    {
+        $this->httpCookie()->get($this->getTokenName());
+    }
+
+    /**
+     * Save the provided token string into the token storage.
+     *
+     * @param string $token Token string to save.
+     */
+    public function setTokenString($token)
+    {
+        $this->httpCookie()->save($this->getTokenName(), $token);
+    }
 }

@@ -19,14 +19,14 @@ use Webiny\Component\StdLib\StdLibTrait;
  *
  * @package        Webiny\Component\Security\User\Providers
  */
-class MemoryProvider implements UserProviderInterface
+class Memory implements UserProviderInterface
 {
     use StdLibTrait;
 
     /**
      * @var array Array with all users.
      */
-    private $_users = [];
+    private $users = [];
 
     /**
      * Constructor.
@@ -34,7 +34,7 @@ class MemoryProvider implements UserProviderInterface
     public function __construct()
     {
         $args = func_get_args();
-        $this->_addUsers($args[0]);
+        $this->addUsers($args[0]);
     }
 
     /**
@@ -45,7 +45,7 @@ class MemoryProvider implements UserProviderInterface
      * @return bool
      * @throws MemoryException
      */
-    private function _addUsers($users)
+    private function addUsers($users)
     {
         if (!is_array($users)) {
             return false;
@@ -66,7 +66,7 @@ class MemoryProvider implements UserProviderInterface
                 $data['roles'] = (array)$data['roles'];
             }
 
-            $this->_users[$username] = $data;
+            $this->users[$username] = $data;
         }
 
         return true;
@@ -86,11 +86,11 @@ class MemoryProvider implements UserProviderInterface
     {
         $username = $login->getUsername();
 
-        if (!isset($this->_users[$username]) || !$this->isArray($this->_users[$username])) {
+        if (!isset($this->users[$username]) || !$this->isArray($this->users[$username])) {
             throw new UserNotFoundException('User "' . $username . '" was not found.');
         }
 
-        $userData = $this->_users[$username];
+        $userData = $this->users[$username];
 
         $user = new User();
         $user->populate($username, $userData['password'], $userData['roles'], false);

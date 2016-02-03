@@ -58,4 +58,23 @@ class Session extends TokenStorageAbstract
     {
         return $this->httpSession()->delete($this->getTokenName());
     }
+
+    /**
+     * Get token string representation
+     * @return string
+     */
+    public function getTokenString()
+    {
+        $this->httpSession()->get($this->getTokenName());
+    }
+
+    /**
+     * Save the provided token string into the token storage.
+     *
+     * @param string $token Token string to save.
+     */
+    public function setTokenString($token)
+    {
+        $this->httpSession()->save($this->getTokenName(), $token);
+    }
 }

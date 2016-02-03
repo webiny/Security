@@ -33,10 +33,13 @@ class SecurityEvent extends Event
     // user not authenticated to access the requested area
     const NOT_AUTHENTICATED = 'wf.security.not_authenticated';
 
+    // user is authenticated
+    const AUTHENTICATED = 'wf.security.authenticated';
+
     /**
      * @var User\UserAbstract
      */
-    private $_user;
+    private $user;
 
 
     /**
@@ -44,9 +47,9 @@ class SecurityEvent extends Event
      *
      * @param UserAbstract $user
      */
-    function __construct(UserAbstract $user)
+    public function __construct(UserAbstract $user)
     {
-        $this->_user = $user;
+        $this->user = $user;
 
         parent::__construct();
     }
@@ -56,8 +59,8 @@ class SecurityEvent extends Event
      *
      * @return UserAbstract
      */
-    function getUser()
+    public function getUser()
     {
-        return $this->_user;
+        return $this->user;
     }
 }

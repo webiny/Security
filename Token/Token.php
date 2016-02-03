@@ -13,7 +13,7 @@ use Webiny\Component\StdLib\Exception\Exception;
 use Webiny\Component\StdLib\FactoryLoaderTrait;
 
 /**
- * Token abstract.
+ * Token
  *
  * @package         Webiny\Component\Security\User\Token
  */
@@ -29,12 +29,12 @@ class Token
     /**
      * @var TokenStorageAbstract
      */
-    private $_storage;
+    private $storage;
 
     /**
      * @var bool
      */
-    private $_rememberMe = false;
+    private $rememberMe = false;
 
     /**
      * Base constructor.
@@ -44,27 +44,69 @@ class Token
      *                                                       token is only valid for current session.
      * @param string                            $securityKey Security key that will be used for encryption of token data
      * @param CryptDrivers\CryptDriverInterface $cryptDriver
+     * @param null|string                       $storageClass
      *
      * @throws TokenException
      * @internal param \Webiny\Component\Security\Token\Crypt\CryptDriverInterface $crypt Name of the crypt driver that we be used to encode the session/cookie.
      *
      */
-    public function __construct($tokenName, $rememberMe = false, $securityKey, CryptDriverInterface $cryptDriver)
-    {
+    public function __construct(
+        $tokenName,
+        $rememberMe = false,
+        $securityKey,
+        CryptDriverInterface $cryptDriver,
+        $storageClass = null
+    ) {
 
-        $this->_rememberMe = $rememberMe;
+        $this->rememberMe = $rememberMe;
 
         try {
-            $this->_storage = $this->factory($this->_getStorageName(),
-                                             '\Webiny\Component\Security\Token\TokenStorageAbstract'
-            );
-            $this->_storage->setSecurityKey($securityKey);
-            $this->_storage->setCrypt($cryptDriver);
+            if (!$storageClass) {
+                $storageClass = $this->getStorageName();
+            }
+            $this->storage = $this->factory($storageClass, '\Webiny\Component\Security\Token\TokenStorageAbstract');
+            $this->storage->setSecurityKey($securityKey);
+            $this->storage->setCrypt($cryptDriver);
         } catch (Exception $e) {
             throw new TokenException($e->getMessage());
         }
 
-        $this->_storage->setTokenName($tokenName);
+        $this->storage->setTokenName($tokenName);
+        $this->storage->setTokenRememberMe($this->rememberMe);
+    }
+
+    /**
+     * Get string representation of token
+     *
+     * @return string
+     */
+    public function getTokenString()
+    {
+        return $this->storage->getTokenString();
+    }
+
+    /**
+     * Save the provided token string into the token storage.
+     *
+     * @param string $token Token string to save.
+     */
+    public function setTokenString($token)
+    {
+        $this->storage->setTokenString($token);
+    }
+
+    /**
+     * Should token be remembered or not
+     *
+     * @param bool $rememberMe
+     * @return $this
+     */
+    public function setRememberMe($rememberMe)
+    {
+        $this->rememberMe = $rememberMe;
+        $this->storage->setTokenRememberMe($rememberMe);
+
+        return $this;
     }
 
     /**
@@ -74,7 +116,7 @@ class Token
      */
     public function getUserFromToken()
     {
-        return $this->_storage->loadUserFromToken();
+        return $this->storage->loadUserFromToken();
     }
 
     /**
@@ -86,7 +128,7 @@ class Token
      */
     public function saveUser(UserAbstract $user)
     {
-        return $this->_storage->saveUserToken($user);
+        return $this->storage->saveUserToken($user);
     }
 
     /**
@@ -96,7 +138,7 @@ class Token
      */
     public function deleteUserToken()
     {
-        return $this->_storage->deleteUserToken();
+        return $this->storage->deleteUserToken();
     }
 
     /**
@@ -105,9 +147,9 @@ class Token
      *
      * @return string
      */
-    private function _getStorageName()
+    private function getStorageName()
     {
-        if ($this->_rememberMe) {
+        if ($this->rememberMe) {
             return self::TOKEN_COOKIE_STORAGE;
         }
 

@@ -18,13 +18,11 @@ use Webiny\Component\Security\Role\RoleHierarchy;
 use Webiny\Component\Security\Security;
 use Webiny\Component\Security\SecurityEvent;
 use Webiny\Component\Security\User\AnonymousUser;
-use Webiny\Component\Security\User\Exceptions\UserNotFoundException;
 use Webiny\Component\Security\User\Providers\Memory;
 use Webiny\Component\Security\Token\Token;
 use Webiny\Component\Security\User\UserAbstract;
 use Webiny\Component\StdLib\Exception\Exception;
 use Webiny\Component\StdLib\FactoryLoaderTrait;
-use Webiny\Component\StdLib\SingletonTrait;
 use Webiny\Component\StdLib\StdLibTrait;
 
 /**
@@ -41,57 +39,84 @@ class Firewall
     /**
      * @var \Webiny\Component\Config\ConfigObject
      */
-    private $_config;
+    private $config;
 
     /**
      * @var array An array of user provider instances.
      */
-    private $_userProviders = [];
+    private $userProviders = [];
 
     /**
      * @var string Name of the current firewall.
      */
-    private $_firewallKey;
+    private $firewallKey;
 
     /**
      * @var \Webiny\Component\Security\Encoder\Encoder
      */
-    private $_encoder;
+    private $encoder;
 
     /**
      * @var Token
      */
-    private $_token;
+    private $token;
 
     /**
      * @var bool|UserAbstract
      */
-    private $_user = false;
+    private $user = false;
 
     /**
      * @var bool Has user already been authenticated.
      */
-    private $_userAuthenticated = false;
+    private $userAuthenticated = false;
 
     /**
      * @var AuthenticationInterface
      */
-    private $_authProvider;
+    private $authProvider;
 
     /**
      * @var \Webiny\Component\Config\ConfigObject
      */
-    private $_authProviderConfig;
+    private $authProviderConfig;
 
     /**
      * @var RoleHierarchy
      */
-    private $_roleHierarchy;
+    private $roleHierarchy;
 
     /**
      * @var AccessControl
      */
-    private $_accessControl;
+    private $accessControl;
+
+    /**
+     * @var string
+     */
+    private $defaultCryptDriver = '\Webiny\Component\Security\Token\CryptDrivers\Crypt\Crypt';
+
+    /**
+     * @var string
+     */
+    private $cryptDriverInterface = 'Webiny\Component\Security\Token\CryptDrivers\CryptDriverInterface';
+
+    /**
+     * @var string
+     */
+    private $authenticationInterface = '\Webiny\Component\Security\Authentication\Providers\AuthenticationInterface';
+
+    /**
+     * @var array A list of currently built-in authentication providers. The keys are used so you don't need to write
+     *            the fully qualified class names in the yaml config.
+     */
+    private static $authProviders = [
+        'Http'         => '\Webiny\Component\Security\Authentication\Providers\Http\Http',
+        'Form'         => '\Webiny\Component\Security\Authentication\Providers\Form\Form',
+        'OAuth2'       => '\Webiny\Component\Security\Authentication\Providers\OAuth2\OAuth2',
+        'TwitterOAuth' => '\Webiny\Component\Security\Authentication\Providers\TwitterOAuth\TwitterOAuth'
+    ];
+
 
     /**
      * Constructor.
@@ -103,12 +128,12 @@ class Firewall
      */
     public function __construct($firewallKey, ConfigObject $firewallConfig, array $userProviders, Encoder $encoder)
     {
-        $this->_firewallKey = $firewallKey;
-        $this->_config = $firewallConfig;
-        $this->_userProviders = $userProviders;
-        $this->_encoder = $encoder;
+        $this->firewallKey = $firewallKey;
+        $this->config = $firewallConfig;
+        $this->userProviders = $userProviders;
+        $this->encoder = $encoder;
 
-        $this->_initToken();
+        $this->initToken();
     }
 
     /**
@@ -125,28 +150,29 @@ class Firewall
     {
         try {
             // if we are on login page, first try to get the instance of Login object from current auth provider
-            $login = $this->_getAuthProvider($authProvider)->getLoginObject($this->getConfig());
+            $login = $this->getAuthProvider($authProvider)->getLoginObject($this->getConfig());
             if (!$this->isInstanceOf($login, 'Webiny\Component\Security\Authentication\Providers\Login')) {
                 throw new FirewallException('Authentication provider method getLoginObject() must return an instance of
-														"Webiny\Component\Security\Authentication\Providers\Login".'
-                );
+														"Webiny\Component\Security\Authentication\Providers\Login".');
             }
-            $login->setAuthProviderName($authProvider);
+            $login->setAuthProviderName($this->authProviderName);
         } catch (\Exception $e) {
             throw new FirewallException($e->getMessage());
         }
 
         // forward the login object to user providers and validate the credentials
-        if (!($this->_user = $this->_authenticate($login))) { // login failed
-            $this->_getAuthProvider($authProvider)->invalidLoginProvidedCallback();
+        $this->user = $this->authenticate($login);
+
+        if (!$this->user) { // login failed
+            $this->getAuthProvider($authProvider)->invalidLoginProvidedCallback();
             $this->eventManager()->fire(SecurityEvent::LOGIN_INVALID, new SecurityEvent(new AnonymousUser()));
 
             return false;
         } else {
-            $this->_getAuthProvider($authProvider)->loginSuccessfulCallback($this->_user);
-            $this->eventManager()->fire(SecurityEvent::LOGIN_VALID, new SecurityEvent($this->_user));
-            $this->_setUserRoles();
-            $this->_userAuthenticated = true;
+            $this->getAuthProvider($authProvider)->loginSuccessfulCallback($this->user);
+            $this->eventManager()->fire(SecurityEvent::LOGIN_VALID, new SecurityEvent($this->user));
+            $this->setUserRoles();
+            $this->userAuthenticated = true;
 
             return true;
         }
@@ -161,10 +187,10 @@ class Firewall
     {
         $this->getToken()->deleteUserToken();
         if ($this->getUser()->isAuthenticated()) {
-            $this->_getAuthProvider($this->_user->getAuthProviderName())->logoutCallback();
+            $this->getAuthProvider($this->user->getAuthProviderName())->logoutCallback();
         }
-        $this->_user = new AnonymousUser();
-        $this->_userAuthenticated = false;
+        $this->user = new AnonymousUser();
+        $this->userAuthenticated = false;
 
         $this->eventManager()->fire(SecurityEvent::LOGOUT);
 
@@ -180,32 +206,34 @@ class Firewall
      */
     public function getUser()
     {
-        if ($this->_userAuthenticated) {
-            return $this->_user;
+        if ($this->userAuthenticated) {
+            return $this->user;
         }
 
         try {
             // get token
-            $this->_user = new AnonymousUser();
+            $this->user = new AnonymousUser();
             $tokenData = $this->getToken()->getUserFromToken();
 
             if (!$tokenData) {
-                $this->eventManager()->fire(SecurityEvent::NOT_AUTHENTICATED, new SecurityEvent($this->_user));
+                $this->eventManager()->fire(SecurityEvent::NOT_AUTHENTICATED, new SecurityEvent($this->user));
 
-                $this->_userAuthenticated = false;
+                $this->userAuthenticated = false;
 
-                return $this->_user;
+                return $this->user;
             } else {
-                $this->_user->populate($tokenData->getUsername(), '', $tokenData->getRoles(), true);
-                $this->_user->setAuthProviderName($tokenData->getAuthProviderName());
-                $this->_setUserRoles();
+                $this->user->populate($tokenData->getUsername(), '', $tokenData->getRoles(), true);
+                $this->user->setAuthProviderName($tokenData->getAuthProviderName());
+                $this->user->setUserProviderName($tokenData->getUserProviderName());
+                $this->eventManager()->fire(SecurityEvent::AUTHENTICATED, new SecurityEvent($this->user));
+                $this->setUserRoles();
 
-                $this->_userAuthenticated = true;
+                $this->userAuthenticated = true;
 
-                return $this->_user;
+                return $this->user;
             }
         } catch (\Exception $e) {
-            $this->_userAuthenticated = true;
+            $this->userAuthenticated = true;
             throw new FirewallException($e->getMessage());
         }
     }
@@ -217,13 +245,13 @@ class Firewall
      */
     public function isUserAllowedAccess()
     {
-        if (!is_object($this->_accessControl)) {
-            $this->_accessControl = new AccessControl($this->_user, $this->_config->get('AccessControl', false));
+        if (!is_object($this->accessControl)) {
+            $this->accessControl = new AccessControl($this->user, $this->config->get('AccessControl', false));
         }
 
-        $isAccessAllowed = $this->_accessControl->isUserAllowedAccess();
+        $isAccessAllowed = $this->accessControl->isUserAllowedAccess();
         if (!$isAccessAllowed) {
-            $this->eventManager()->fire(SecurityEvent::ROLE_INVALID, new SecurityEvent($this->_user));
+            $this->eventManager()->fire(SecurityEvent::ROLE_INVALID, new SecurityEvent($this->user));
         }
 
         return $isAccessAllowed;
@@ -236,7 +264,7 @@ class Firewall
      */
     public function getRealmName()
     {
-        return $this->_config->RealmName;
+        return $this->config->RealmName;
     }
 
     /**
@@ -247,7 +275,7 @@ class Firewall
      */
     public function getAnonymousAccess()
     {
-        return $this->_config->get('Anonymous', false);
+        return $this->config->get('Anonymous', false);
     }
 
     /**
@@ -257,7 +285,7 @@ class Firewall
      */
     public function getConfig()
     {
-        return $this->_config;
+        return $this->config;
     }
 
     /**
@@ -267,7 +295,7 @@ class Firewall
      */
     public function getToken()
     {
-        return $this->_token;
+        return $this->token;
     }
 
     /**
@@ -276,7 +304,7 @@ class Firewall
      */
     public function getFirewallKey()
     {
-        return $this->_firewallKey;
+        return $this->firewallKey;
     }
 
     /**
@@ -286,8 +314,9 @@ class Firewall
      *
      * @return string Password hash.
      */
-    public function createPasswordHash($password){
-        return $this->_encoder->createPasswordHash($password);
+    public function createPasswordHash($password)
+    {
+        return $this->encoder->createPasswordHash($password);
     }
 
     /**
@@ -298,12 +327,13 @@ class Firewall
      *
      * @return bool True if $password matches $hash. Otherwise false is returned.
      */
-    public function verifyPasswordHash($password, $hash){
-        return $this->_encoder->verifyPasswordHash($password, $hash);
+    public function verifyPasswordHash($password, $hash)
+    {
+        return $this->encoder->verifyPasswordHash($password, $hash);
     }
 
     /**
-     * Returns the config of current auth provider based on current url.
+     * Returns the config of current auth provider.
      *
      * @param string $authProvider Name of the auth provider you wish to use to process the login.
      *                             If you don't set it, the first registered provider will be used.
@@ -311,27 +341,40 @@ class Firewall
      * @throws FirewallException
      * @return ConfigObject
      */
-    private function _getAuthProviderConfig($authProvider)
+    private function getAuthProviderConfig($authProvider)
     {
         // have we already fetched the auth config
-        if ($this->_authProviderConfig) {
-            return $this->_authProviderConfig;
+        if ($this->authProviderConfig) {
+            return $this->authProviderConfig;
         }
 
         if ($authProvider == '') {
-            // get the first config
+            // get the first auth provider from the list
             $providers = $this->getConfig()->get('AuthenticationProviders', []);
-            $this->_authProviderConfig = Security::getConfig()->get('AuthenticationProviders.' . $providers[0], false);
-        } else {
-            $this->_authProviderConfig = Security::getConfig()->get('AuthenticationProviders.' . $authProvider, false);
+            $authProvider = $providers[0];
         }
 
-        if (!$this->_authProviderConfig || !$this->_authProviderConfig->get('Driver', false)) {
-            throw new FirewallException('Unable to detect configuration for authentication provider "' . $authProvider . '".'
-            );
+        $this->authProviderConfig = Security::getConfig()->get('AuthenticationProviders.' . $authProvider, new ConfigObject());
+
+        // merge the internal driver
+        // merge only if driver is not set and it matches the internal auth provider name
+        if (!$this->authProviderConfig->get('Driver', false) && isset(self::$authProviders[$authProvider])) {
+            $this->authProviderConfig->mergeWith(['Driver' => self::$authProviders[$authProvider]]);
         }
 
-        return $this->_authProviderConfig;
+        // make sure the requested auth provider is assigned to the current firewall
+        if (!in_array($authProvider, $this->getConfig()->get('AuthenticationProviders', [])->toArray())) {
+            throw new FirewallException('Authentication provider "' . $authProvider . '" is not defined on "' . $this->getFirewallKey() . '" firewall.');
+        }
+
+        // check that we have the driver
+        if (!$this->authProviderConfig->get('Driver', false)) {
+            throw new FirewallException('Unable to detect configuration for authentication provider "' . $authProvider . '".');
+        }
+
+        $this->authProviderName = $authProvider;
+
+        return $this->authProviderConfig;
     }
 
     /**
@@ -345,53 +388,21 @@ class Firewall
      * @return bool|UserAbstract
      * @throws FirewallException
      */
-    private function _authenticate(Login $login)
+    private function authenticate(Login $login)
     {
-        try {
-            $user = $this->_getUserFromUserProvider($login);
-        } catch (\Exception $e) {
-            return false;
-        }
-
-        if ($user) {
-            if ($user->authenticate($login, $this)) {
-                // save info about current auth provider into user instance
-                $user->setAuthProviderName($login->getAuthProviderName());
-
-                // save token
-                $this->getToken()->saveUser($user);
-
-                return $user;
-            } else {
-                return false;
-            }
-        }
-
-        return false;
-    }
-
-    /**
-     * Tries to load user object from the registered user providers based on the data inside the Login object instance.
-     *
-     * @param Login $login Login object received from authentication provider.
-     *
-     * @return UserAbstract|bool Instance of UserAbstract, if user is found, or false if user is not found.
-     * @throws FirewallException
-     */
-    private function _getUserFromUserProvider(Login $login)
-    {
-        foreach ($this->_userProviders as $provider) {
+        foreach ($this->userProviders as $name => $provider) {
             try {
+                /* @var UserAbstract $user */
                 $user = $provider->getUser($login);
-                if ($user) {
+                if ($user && $user->authenticate($login, $this)) {
+                    $user->setUserProviderName($name);
                     $user->setAuthProviderName($login->getAuthProviderName());
+                    $this->getToken()->setRememberMe($login->getRememberMe())->saveUser($user);
 
                     return $user;
                 }
-            } catch (UserNotFoundException $e) {
-                // next user provider
             } catch (\Exception $e) {
-                throw new FirewallException($e->getMessage());
+                // next user provider
             }
         }
 
@@ -401,33 +412,37 @@ class Firewall
     /**
      * Initializes the Token.
      */
-    private function _initToken()
+    private function initToken()
     {
         $tokenName = $this->getConfig()->get('Token', false);
-        if (!$tokenName) {
-            throw new FirewallException('Token for "' . $this->_firewallKey . '" firewall is not defined.');
-        }
         $rememberMe = $this->getConfig()->get('RememberMe', false);
-        $securityKey = Security::getConfig()->get('Tokens.' . $tokenName . '.SecurityKey', false);
 
-        if (!$securityKey) {
-            throw new FirewallException('Missing security key for "' . $tokenName . '" token.');
+
+        if (!$tokenName) {
+            // fallback to the default token
+            $securityKey = $this->getConfig()->get('TokenKey', false);
+
+            if (!$securityKey) {
+                throw new FirewallException('Missing TokenKey for "' . $this->getRealmName() . '" firewall.');
+            }
+        } else {
+            $securityKey = Security::getConfig()->get('Tokens.' . $tokenName . '.SecurityKey', false);
+
+            if (!$securityKey) {
+                throw new FirewallException('Missing security key for "' . $tokenName . '" token.');
+            }
         }
-        $tokenCryptDriver = Security::getConfig()->get('Tokens.' . $tokenName . '.Driver', false);
-        if (!$tokenCryptDriver) {
-            throw new FirewallException('Driver parameter for token "' . $tokenName . '" is not defined.');
-        }
+
+        $tokenCryptDriver = Security::getConfig()->get('Tokens.' . $tokenName . '.Driver', $this->defaultCryptDriver);
         $tokenCryptParams = Security::getConfig()->get('Tokens.' . $tokenName . '.Params', [], true);
         try {
-            $tokenCrypt = $this->factory($tokenCryptDriver,
-                                         'Webiny\Component\Security\Token\CryptDrivers\CryptDriverInterface',
-                                         $tokenCryptParams
-            );
+            $tokenCrypt = $this->factory($tokenCryptDriver, $this->cryptDriverInterface, $tokenCryptParams);
         } catch (\Exception $e) {
             throw new FirewallException($e->getMessage());
         }
 
-        $this->_token = new Token($this->_getTokenName(), $rememberMe, $securityKey, $tokenCrypt);
+        $storageClass = Security::getConfig()->get('Tokens.' . $tokenName . '.StorageDriver');
+        $this->token = new Token($this->getTokenName(), $rememberMe, $securityKey, $tokenCrypt, $storageClass);
     }
 
     /**
@@ -435,9 +450,9 @@ class Firewall
      *
      * @return string
      */
-    private function _getTokenName()
+    private function getTokenName()
     {
-        return 'wf_token_' . $this->_firewallKey . '_realm';
+        return strtolower($this->firewallKey) . '_token';
     }
 
     /**
@@ -450,42 +465,39 @@ class Firewall
      *
      * @throws FirewallException
      */
-    private function _getAuthProvider($authProvider)
+    private function getAuthProvider($authProvider)
     {
-        if (is_null($this->_authProvider)) {
+        if (is_null($this->authProvider)) {
             // auth provider config
-            $authProviderConfig = $this->_getAuthProviderConfig($authProvider);
+            $authProviderConfig = $this->getAuthProviderConfig($authProvider);
 
             // optional params that will be passed to auth provider constructor
             $params = $authProviderConfig->get('Params', [], true);
 
             try {
-                $this->_authProvider = $this->factory($authProviderConfig->Driver,
-                                                      '\Webiny\Component\Security\Authentication\Providers\AuthenticationInterface',
-                                                      $params
-                );
+                $this->authProvider = $this->factory($authProviderConfig->Driver, $this->authenticationInterface, $params);
             } catch (Exception $e) {
                 throw new FirewallException($e->getMessage());
             }
         }
 
-        return $this->_authProvider;
+        return $this->authProvider;
     }
 
     /**
      * Initializes role hierarchy.
      */
-    private function _initRoleHierarchy()
+    private function initRoleHierarchy()
     {
-        $this->_roleHierarchy = new RoleHierarchy($this->_config->get('RoleHierarchy', [], true));
+        $this->roleHierarchy = new RoleHierarchy($this->config->get('RoleHierarchy', [], true));
     }
 
     /**
      * Sets roles for current user.
      */
-    private function _setUserRoles()
+    private function setUserRoles()
     {
-        $this->_initRoleHierarchy();
-        $this->_user->setRoles($this->_roleHierarchy->getAccessibleRoles($this->_user->getRoles()));
+        $this->initRoleHierarchy();
+        $this->user->setRoles($this->roleHierarchy->getAccessibleRoles($this->user->getRoles()));
     }
 }
