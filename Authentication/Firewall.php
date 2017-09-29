@@ -11,14 +11,20 @@ use Webiny\Component\Config\ConfigObject;
 use Webiny\Component\EventManager\EventManagerTrait;
 use Webiny\Component\Http\HttpTrait;
 use Webiny\Component\Security\Authentication\Providers\AuthenticationInterface;
+use Webiny\Component\Security\Authentication\Providers\Form\Form;
+use Webiny\Component\Security\Authentication\Providers\Http\Http;
 use Webiny\Component\Security\Authentication\Providers\Login;
+use Webiny\Component\Security\Authentication\Providers\OAuth2\OAuth2;
+use Webiny\Component\Security\Authentication\Providers\TwitterOAuth\TwitterOAuth;
 use Webiny\Component\Security\Authorization\AccessControl;
 use Webiny\Component\Security\Encoder\Encoder;
 use Webiny\Component\Security\Role\RoleHierarchy;
 use Webiny\Component\Security\Security;
 use Webiny\Component\Security\SecurityEvent;
+use Webiny\Component\Security\Token\CryptDrivers\Crypt\Crypt;
+use Webiny\Component\Security\Token\CryptDrivers\CryptDriverInterface;
+use Webiny\Component\Security\Token\TokenException;
 use Webiny\Component\Security\User\AnonymousUser;
-use Webiny\Component\Security\User\Providers\Memory;
 use Webiny\Component\Security\Token\Token;
 use Webiny\Component\Security\User\AbstractUser;
 use Webiny\Component\StdLib\Exception\Exception;
@@ -77,6 +83,11 @@ class Firewall
     private $authProvider;
 
     /**
+     * @var string
+     */
+    private $authProviderName;
+
+    /**
      * @var \Webiny\Component\Config\ConfigObject
      */
     private $authProviderConfig;
@@ -94,37 +105,36 @@ class Firewall
     /**
      * @var string
      */
-    private $defaultCryptDriver = '\Webiny\Component\Security\Token\CryptDrivers\Crypt\Crypt';
+    private $defaultCryptDriver = Crypt::class;
 
     /**
      * @var string
      */
-    private $cryptDriverInterface = 'Webiny\Component\Security\Token\CryptDrivers\CryptDriverInterface';
+    private $cryptDriverInterface = CryptDriverInterface::class;
 
     /**
      * @var string
      */
-    private $authenticationInterface = '\Webiny\Component\Security\Authentication\Providers\AuthenticationInterface';
+    private $authenticationInterface = AuthenticationInterface::class;
 
     /**
      * @var array A list of currently built-in authentication providers. The keys are used so you don't need to write
      *            the fully qualified class names in the yaml config.
      */
     private static $authProviders = [
-        'Http'         => '\Webiny\Component\Security\Authentication\Providers\Http\Http',
-        'Form'         => '\Webiny\Component\Security\Authentication\Providers\Form\Form',
-        'OAuth2'       => '\Webiny\Component\Security\Authentication\Providers\OAuth2\OAuth2',
-        'TwitterOAuth' => '\Webiny\Component\Security\Authentication\Providers\TwitterOAuth\TwitterOAuth'
+        'Http'         => Http::class,
+        'Form'         => Form::class,
+        'OAuth2'       => OAuth2::class,
+        'TwitterOAuth' => TwitterOAuth::class
     ];
-
 
     /**
      * Constructor.
      *
-     * @param string       $firewallKey    Name of the current firewall.
+     * @param string       $firewallKey Name of the current firewall.
      * @param ConfigObject $firewallConfig Firewall config.
-     * @param array        $userProviders  Array of user providers for this firewall.
-     * @param Encoder      $encoder        Instance of encoder for this firewall.
+     * @param array        $userProviders Array of user providers for this firewall.
+     * @param Encoder      $encoder Instance of encoder for this firewall.
      */
     public function __construct($firewallKey, ConfigObject $firewallConfig, array $userProviders, Encoder $encoder)
     {
@@ -151,9 +161,8 @@ class Firewall
         try {
             // if we are on login page, first try to get the instance of Login object from current auth provider
             $login = $this->getAuthProvider($authProvider)->getLoginObject($this->getConfig());
-            if (!$this->isInstanceOf($login, 'Webiny\Component\Security\Authentication\Providers\Login')) {
-                throw new FirewallException('Authentication provider method getLoginObject() must return an instance of
-														"Webiny\Component\Security\Authentication\Providers\Login".');
+            if (!$this->isInstanceOf($login, Login::class)) {
+                throw new FirewallException('Authentication provider method getLoginObject() must return an instance of "' . Login::class . '".');
             }
             $login->setAuthProviderName($this->authProviderName);
         } catch (\Exception $e) {
@@ -200,9 +209,9 @@ class Firewall
     /**
      * Tries to retrieve the user from current token.
      * If the token does not exist, AnonymousUser is returned.
-     *
+     * @return bool|AbstractUser
      * @throws FirewallException
-     * @return bool|\Webiny\Component\Security\User\AbstractUser
+     * @throws TokenException
      */
     public function getUser()
     {
@@ -232,6 +241,8 @@ class Firewall
 
                 return $this->user;
             }
+        } catch (TokenException $e) {
+            throw $e;
         } catch (\Exception $e) {
             $this->userAuthenticated = true;
             throw new FirewallException($e->getMessage());
